@@ -15,8 +15,25 @@
   <!-- Babel for Browser JSX Compiling -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Firebase 11 SDK Modules -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+
+    // Firebase configuration for peo-retro-king
+    const firebaseConfig = {
+      databaseURL: "https://peo-retro-king-default-rtdb.firebaseio.com"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // Expose database utilities globally for React component
+    window.dbRef = ref;
+    window.dbOnValue = onValue;
+    window.dbSet = set;
+    window.firebaseDb = db;
+  </script>
 
   <style>
     body {
@@ -109,10 +126,9 @@
 
     function App() {
       const [activeTab, setActiveTab] = useState('judging');
-      const [contestants, setContestants] = useState(() => {
-        const saved = localStorage.getItem('peo_contestants_v4');
-        return saved ? JSON.parse(saved) : INITIAL_CONTESTANTS;
-      });
+      const [contestants, setContestants] = useState([]);
+      const [scores, setScores] = useState({});
+      const [isCloudConnected, setIsCloudConnected] = useState(false);
       
       const [newContestantName, setNewContestantName] = useState('');
       const [capturedPhoto, setCapturedPhoto] = useState(null);
@@ -128,11 +144,7 @@
       const canvasRef = useRef(null);
       const audioCtxRef = useRef(null);
 
-      const [scores, setScores] = useState(() => {
-        const saved = localStorage.getItem('peo_scores_v3');
-        return saved ? JSON.parse(saved) : {};
-      });
-
+      // Reveal Modal State
       const [revealModal, setRevealModal] = useState({
         isOpen: false,
         title: '',
@@ -141,6 +153,113 @@
         countdown: 10,
         isCounting: false
       });
+
+      // --- REALTIME FIREBASE LISTENERS ---
+      useEffect(() => {
+        let unsubscribeContestants;
+        let unsubscribeScores;
+
+        const initFirebaseListeners = () => {
+          if (!window.firebaseDb) {
+            setTimeout(initFirebaseListeners, 100);
+            return;
+          }
+
+          // Listen to Contestants in Realtime Cloud Database
+          const contestantsRef = window.dbRef(window.firebaseDb, 'contestants');
+          unsubscribeContestants = window.dbOnValue(contestantsRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+              const list = Object.values(data);
+              setContestants(list);
+            } else {
+              setContestants(INITIAL_CONTESTANTS);
+            }
+            setIsCloudConnected(true);
+          });
+
+          // Listen to Scores in Realtime Cloud Database
+          const scoresRef = window.dbRef(window.firebaseDb, 'scores');
+          unsubscribeScores = window.dbOnValue(scoresRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+              setScores(data);
+            } else {
+              setScores({});
+            }
+          });
+        };
+
+        initFirebaseListeners();
+
+        return () => {
+          if (unsubscribeContestants) unsubscribeContestants();
+          if (unsubscribeScores) unsubscribeScores();
+        };
+      }, []);
+
+      // Realtime Cloud Write: Add Contestant
+      const handleAddContestant = (e) => {
+        e.preventDefault();
+        if (!newContestantName.trim()) return;
+        
+        const nextNumber = contestants.length > 0 ? Math.max(...contestants.map(c => c.id)) + 1 : 1;
+        const newContestant = { 
+          id: nextNumber, 
+          name: newContestantName.trim(),
+          photo: capturedPhoto 
+        };
+
+        const updatedList = [...contestants, newContestant];
+        
+        if (window.firebaseDb) {
+          window.dbSet(window.dbRef(window.firebaseDb, 'contestants/' + nextNumber), newContestant);
+        } else {
+          setContestants(updatedList);
+        }
+
+        setNewContestantName('');
+        setCapturedPhoto(null);
+        stopCamera();
+      };
+
+      // Realtime Cloud Write: Delete Contestant
+      const handleDeleteContestant = (id) => {
+        if (window.firebaseDb) {
+          window.dbSet(window.dbRef(window.firebaseDb, 'contestants/' + id), null);
+          window.dbSet(window.dbRef(window.firebaseDb, 'scores/' + id), null);
+        } else {
+          setContestants(contestants.filter(c => c.id !== id));
+        }
+
+        if (selectedContestantId === id) {
+          const remaining = contestants.filter(c => c.id !== id);
+          if (remaining.length > 0) setSelectedContestantId(remaining[0].id);
+        }
+      };
+
+      // Realtime Cloud Write: Score Updates
+      const handleScoreChange = (contestantId, judge, criteriaId, val) => {
+        const numericVal = Math.min(25, Math.max(0, Number(val) || 0));
+        
+        if (window.firebaseDb) {
+          window.dbSet(
+            window.dbRef(window.firebaseDb, `scores/${contestantId}/${judge}/${criteriaId}`),
+            numericVal
+          );
+        } else {
+          setScores(prev => ({
+            ...prev,
+            [contestantId]: {
+              ...prev[contestantId],
+              [judge]: {
+                ...prev[contestantId]?.[judge],
+                [criteriaId]: numericVal
+              }
+            }
+          }));
+        }
+      };
 
       const startCamera = async () => {
         try {
@@ -206,14 +325,6 @@
       useEffect(() => {
         return () => stopCamera();
       }, []);
-
-      useEffect(() => {
-        localStorage.setItem('peo_contestants_v4', JSON.stringify(contestants));
-      }, [contestants]);
-
-      useEffect(() => {
-        localStorage.setItem('peo_scores_v3', JSON.stringify(scores));
-      }, [scores]);
 
       const getAudioContext = () => {
         if (!audioCtxRef.current) {
@@ -381,48 +492,6 @@
         } catch (e) {
           console.warn("Fanfare error:", e);
         }
-      };
-
-      const handleAddContestant = (e) => {
-        e.preventDefault();
-        if (!newContestantName.trim()) return;
-        
-        const nextNumber = contestants.length > 0 ? Math.max(...contestants.map(c => c.id)) + 1 : 1;
-        const newContestant = { 
-          id: nextNumber, 
-          name: newContestantName.trim(),
-          photo: capturedPhoto 
-        };
-        
-        setContestants([...contestants, newContestant]);
-        setNewContestantName('');
-        setCapturedPhoto(null);
-        stopCamera();
-      };
-
-      const handleDeleteContestant = (id) => {
-        setContestants(contestants.filter(c => c.id !== id));
-        const newScores = { ...scores };
-        delete newScores[id];
-        setScores(newScores);
-        if (selectedContestantId === id) {
-          const remaining = contestants.filter(c => c.id !== id);
-          if (remaining.length > 0) setSelectedContestantId(remaining[0].id);
-        }
-      };
-
-      const handleScoreChange = (contestantId, judge, criteriaId, val) => {
-        const numericVal = Math.min(25, Math.max(0, Number(val) || 0));
-        setScores(prev => ({
-          ...prev,
-          [contestantId]: {
-            ...prev[contestantId],
-            [judge]: {
-              ...prev[contestantId]?.[judge],
-              [criteriaId]: numericVal
-            }
-          }
-        }));
       };
 
       const getCriteriaScore = (contestantId, judge, criteriaId) => {
@@ -634,11 +703,14 @@
                     <Crown className="w-6 h-6 stroke-[2.5]" />
                   </div>
                   <div>
-                    <h1 className="text-lg sm:text-xl font-extrabold tracking-wider bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-500 bg-clip-text text-transparent uppercase leading-tight">
+                    <h1 className="text-lg sm:text-xl font-extrabold tracking-wider bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-500 bg-clip-text text-transparent uppercase leading-tight flex items-center gap-2">
                       PEO Retro King
+                      {isCloudConnected && (
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" title="Live Cloud Sync Active"></span>
+                      )}
                     </h1>
-                    <p className="text-[10px] text-amber-400/80 tracking-widest uppercase font-semibold">
-                      Welfare Event 16:9 Screen Mode
+                    <p className="text-[10px] text-amber-400/80 tracking-widest uppercase font-semibold flex items-center gap-1">
+                      Welfare Event • {isCloudConnected ? '🟢 Live Cloud Database Synced' : '🟡 Connecting Cloud...'}
                     </p>
                   </div>
                 </div>
@@ -1003,9 +1075,9 @@
                       </div>
                     )}
 
-                    <div className="mt-8 pt-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                    <div className="mt-8 pt-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 font-mono">
                       <span className="flex items-center gap-2">
-                        <UserCheck className="w-4 h-4 text-emerald-400" /> All entries auto-saved locally
+                        <UserCheck className="w-4 h-4 text-emerald-400" /> Live Firebase Database Sync Active
                       </span>
                       <span>Max achievable score: 100 Points</span>
                     </div>
