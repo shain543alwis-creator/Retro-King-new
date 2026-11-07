@@ -142,6 +142,7 @@
 
       const canvasRef = useRef(null);
       const audioCtxRef = useRef(null);
+      const stageAmbienceIntervalRef = useRef(null);
 
       const [revealModal, setRevealModal] = useState({
         isOpen: false,
@@ -151,6 +152,59 @@
         countdown: 10,
         isCounting: false
       });
+
+      // Ambient Stage Background Music for Winners tab
+      useEffect(() => {
+        if (activeTab === 'stage' && soundEnabled) {
+          const playStageAmbience = () => {
+            try {
+              const ctx = getAudioContext();
+              const now = ctx.currentTime;
+              const chordFreqs = [130.81, 196.00, 261.63, 329.63]; // C3, G3, C4, E4 ambient pad
+
+              chordFreqs.forEach((freq, idx) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                const filter = ctx.createBiquadFilter();
+
+                osc.type = idx % 2 === 0 ? 'sine' : 'triangle';
+                osc.frequency.setValueAtTime(freq, now);
+
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(400, now);
+
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(0.04, now + 1.5);
+                gain.gain.linearRampToValueAtTime(0, now + 4.0);
+
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 4.2);
+              });
+            } catch (e) {
+              console.warn("Ambience audio error:", e);
+            }
+          };
+
+          playStageAmbience();
+          stageAmbienceIntervalRef.current = setInterval(playStageAmbience, 5000);
+        } else {
+          if (stageAmbienceIntervalRef.current) {
+            clearInterval(stageAmbienceIntervalRef.current);
+            stageAmbienceIntervalRef.current = null;
+          }
+        }
+
+        return () => {
+          if (stageAmbienceIntervalRef.current) {
+            clearInterval(stageAmbienceIntervalRef.current);
+            stageAmbienceIntervalRef.current = null;
+          }
+        };
+      }, [activeTab, soundEnabled]);
 
       const handleSelectRole = (role) => {
         setUserRole(role);
@@ -1537,35 +1591,39 @@
                 <p className="text-xs text-slate-400 font-mono">Suspense building...</p>
               </div>
             ) : (
-              <div className="space-y-5 animate-in fade-in zoom-in duration-500">
-                <div className="inline-flex items-center gap-2 px-5 py-1.5 rounded-full bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 text-xs font-bold uppercase tracking-widest">
+              <div className="space-y-5 animate-in fade-in zoom-in duration-700 transition-transform">
+                <div className="inline-flex items-center gap-2 px-5 py-1.5 rounded-full bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 text-xs font-bold uppercase tracking-widest animate-bounce">
                   <Sparkles className="w-4 h-4 text-cyan-400" />
                   {revealModal.title}
                 </div>
 
                 <div className="space-y-1">
-                  <h4 className="text-xs uppercase tracking-widest text-slate-400 font-semibold">
+                  <h4 className="text-xs uppercase tracking-widest text-slate-400 font-semibold animate-pulse">
                     Congratulations To Contestant #{revealModal.contestant.id}!
                   </h4>
-                  <h1 className="text-3xl sm:text-5xl font-black bg-gradient-to-r from-cyan-200 via-blue-100 to-green-400 bg-clip-text text-transparent tracking-wide leading-tight">
+                  <h1 className="text-3xl sm:text-5xl font-black bg-gradient-to-r from-cyan-200 via-blue-100 to-green-400 bg-clip-text text-transparent tracking-wide leading-tight drop-shadow-[0_10px_20px_rgba(0,174,235,0.4)]">
                     {revealModal.contestant.name}
                   </h1>
                 </div>
 
-                <div className="relative w-32 h-32 mx-auto my-3 flex items-center justify-center">
-                  <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 via-blue-500 to-green-500 rounded-full blur-2xl opacity-80 animate-pulse"></div>
-                  <div className="relative w-full h-full bg-slate-950 border-4 border-cyan-400 rounded-full flex items-center justify-center shadow-2xl overflow-hidden">
+                <div className="relative w-36 h-36 mx-auto my-4 flex items-center justify-center animate-[spin_6s_linear_infinite]" style={{ transformStyle: 'preserve-3d' }}>
+                  <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 via-blue-500 to-green-500 rounded-full blur-2xl opacity-90 animate-pulse"></div>
+                  <div className="relative w-full h-full bg-slate-950 border-4 border-cyan-400 rounded-full flex items-center justify-center shadow-2xl overflow-hidden scale-110">
                     {revealModal.contestant.photo ? (
                       <img src={revealModal.contestant.photo} alt={revealModal.contestant.name} className="w-full h-full object-cover" />
                     ) : (
-                      <Crown className="w-14 h-14 text-cyan-400 stroke-[2.5] animate-bounce" />
+                      <Crown className="w-16 h-16 text-cyan-400 stroke-[2.5] animate-bounce" />
                     )}
                   </div>
                 </div>
 
+                <div className="flex justify-center gap-2 text-xs text-cyan-300 font-bold uppercase tracking-widest">
+                  <span className="px-3 py-1 bg-cyan-500/20 rounded-lg border border-cyan-500/40 animate-pulse">👑 Grand Official Finalist</span>
+                </div>
+
                 <button
                   onClick={() => setRevealModal({ ...revealModal, isOpen: false })}
-                  className="mt-4 px-6 py-3 bg-gradient-to-r from-cyan-400 via-blue-500 to-green-400 text-slate-950 font-bold rounded-xl shadow hover:from-cyan-300 transition-all text-xs uppercase tracking-wider"
+                  className="mt-4 px-6 py-3 bg-gradient-to-r from-cyan-400 via-blue-500 to-green-400 text-slate-950 font-bold rounded-xl shadow-lg hover:scale-105 transition-all text-xs uppercase tracking-wider"
                 >
                   Close & Return to Stage
                 </button>
