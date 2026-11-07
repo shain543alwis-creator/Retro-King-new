@@ -914,7 +914,7 @@
 
                         <div>
                           <label className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">
-                            Real-time Camera Photo
+                            Real-time Camera Photo (Optional)
                           </label>
 
                           <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-col items-center justify-center min-h-[160px] relative overflow-hidden">
@@ -987,12 +987,13 @@
                           <Users className="w-4 h-4 text-amber-400" />
                           Enrolled Competitors ({contestants.length})
                         </h3>
+                        <p className="text-[11px] text-slate-400">Admin management list with delete permissions</p>
                       </div>
                     </div>
 
                     {contestants.length === 0 ? (
                       <div className="text-center py-12 text-slate-500 text-sm">
-                        No contestants added yet.
+                        No contestants added yet. Add contestants using the form on the left.
                       </div>
                     ) : (
                       <div className="space-y-2.5 overflow-y-auto pr-1 flex-1 max-h-[360px]">
@@ -1024,10 +1025,11 @@
 
                               <button
                                 onClick={() => handleDeleteContestant(c.id)}
-                                className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                                className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all flex items-center gap-1 text-xs font-semibold"
                                 title="Delete Contestant"
                               >
                                 <Trash2 className="w-4 h-4" />
+                                <span>Delete</span>
                               </button>
                             </div>
                           );
