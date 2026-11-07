@@ -453,47 +453,51 @@
           const ctx = getAudioContext();
           const now = ctx.currentTime;
 
-          const osc = ctx.createOscillator();
-          const oscGain = ctx.createGain();
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(140, now);
-          osc.frequency.exponentialRampToValueAtTime(30, now + 0.35);
+          const launchOsc = ctx.createOscillator();
+          const launchGain = ctx.createGain();
+          launchOsc.type = 'sine';
+          launchOsc.frequency.setValueAtTime(120, now);
+          launchOsc.frequency.exponentialRampToValueAtTime(30, now + 0.25);
+          
+          launchGain.gain.setValueAtTime(0.5, now);
+          launchGain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+          
+          launchOsc.connect(launchGain);
+          launchGain.connect(ctx.destination);
+          launchOsc.start(now);
+          launchOsc.stop(now + 0.3);
 
-          oscGain.gain.setValueAtTime(0.8, now);
-          oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
-
-          osc.connect(oscGain);
-          oscGain.connect(ctx.destination);
-          osc.start(now);
-          osc.stop(now + 0.4);
-
-          const bufferSize = ctx.sampleRate * 0.25;
+          const burstDelay = now + 0.28;
+          const bufferSize = ctx.sampleRate * 0.6;
           const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
           const data = buffer.getChannelData(0);
+          
           for (let i = 0; i < bufferSize; i++) {
-            data[i] = Math.random() * 2 - 1;
+            const noise = Math.random() * 2 - 1;
+            data[i] = noise * Math.exp(-i / (ctx.sampleRate * 0.15));
           }
 
-          const noise = ctx.createBufferSource();
-          noise.buffer = buffer;
+          const noiseSource = ctx.createBufferSource();
+          noiseSource.buffer = buffer;
 
-          const noiseFilter = ctx.createBiquadFilter();
-          noiseFilter.type = 'bandpass';
-          noiseFilter.frequency.setValueAtTime(800 + Math.random() * 600, now);
-          noiseFilter.Q.setValueAtTime(1.5, now);
+          const filter = ctx.createBiquadFilter();
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(400, burstDelay);
+          filter.frequency.linearRampToValueAtTime(1200, burstDelay + 0.1);
+          filter.frequency.exponentialRampToValueAtTime(200, burstDelay + 0.5);
 
           const noiseGain = ctx.createGain();
-          noiseGain.gain.setValueAtTime(0.4, now);
-          noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+          noiseGain.gain.setValueAtTime(0.7, burstDelay);
+          noiseGain.gain.exponentialRampToValueAtTime(0.001, burstDelay + 0.6);
 
-          noise.connect(noiseFilter);
-          noiseFilter.connect(noiseGain);
+          noiseSource.connect(filter);
+          filter.connect(noiseGain);
           noiseGain.connect(ctx.destination);
 
-          noise.start(now);
-          noise.stop(now + 0.26);
+          noiseSource.start(burstDelay);
+          noiseSource.stop(burstDelay + 0.65);
         } catch (e) {
-          console.warn("Firework sound issue:", e);
+          console.warn("Firework audio error:", e);
         }
       };
 
@@ -503,45 +507,52 @@
           const ctx = getAudioContext();
           const now = ctx.currentTime;
 
-          const fanfareNotes = rank === 1 
-            ? [ { note: 261.63, duration: 0.2 }, { note: 329.63, duration: 0.2 }, { note: 392.00, duration: 0.2 }, { note: 523.25, duration: 0.8 } ]
-            : rank === 2 
-            ? [ { note: 220.00, duration: 0.2 }, { note: 277.18, duration: 0.2 }, { note: 329.63, duration: 0.2 }, { note: 440.00, duration: 0.6 } ]
-            : [ { note: 196.00, duration: 0.2 }, { note: 246.94, duration: 0.2 }, { note: 293.66, duration: 0.2 }, { note: 392.00, duration: 0.5 } ];
+          const chords = rank === 1 ? [
+            { freqs: [261.63, 329.63, 392.00, 523.25], duration: 0.3 },
+            { freqs: [293.66, 369.99, 440.00, 587.33], duration: 0.3 },
+            { freqs: [329.63, 415.30, 493.88, 659.25], duration: 0.3 },
+            { freqs: [523.25, 659.25, 783.99, 1046.50], duration: 1.2 }
+          ] : [
+            { freqs: [220.00, 277.18, 329.63, 440.00], duration: 0.4 },
+            { freqs: [261.63, 329.63, 392.00, 523.25], duration: 0.4 },
+            { freqs: [329.63, 415.30, 493.88, 659.25], duration: 0.9 }
+          ];
 
-          let timeOffset = 0;
+          let currentTimeOffset = 0;
 
-          fanfareNotes.forEach((item) => {
-            const noteStartTime = now + timeOffset;
+          chords.forEach((chordData) => {
+            const chordStartTime = now + currentTimeOffset;
 
-            [-6, 6].forEach((detune) => {
-              const osc = ctx.createOscillator();
-              const filter = ctx.createBiquadFilter();
-              const gain = ctx.createGain();
+            chordData.freqs.forEach((freq) => {
+              [-4, 4].forEach((detuneVal) => {
+                const osc = ctx.createOscillator();
+                const filter = ctx.createBiquadFilter();
+                const gain = ctx.createGain();
 
-              osc.type = 'sawtooth';
-              osc.frequency.setValueAtTime(item.note, noteStartTime);
-              osc.detune.setValueAtTime(detune, noteStartTime);
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(freq, chordStartTime);
+                osc.detune.setValueAtTime(detuneVal, chordStartTime);
 
-              filter.type = 'lowpass';
-              filter.frequency.setValueAtTime(item.note * 1.5, noteStartTime);
-              filter.frequency.exponentialRampToValueAtTime(item.note * 4, noteStartTime + 0.05);
-              filter.frequency.exponentialRampToValueAtTime(item.note * 2, noteStartTime + item.duration);
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(freq * 1.8, chordStartTime);
+                filter.frequency.exponentialRampToValueAtTime(freq * 3.5, chordStartTime + 0.1);
+                filter.frequency.exponentialRampToValueAtTime(freq * 2, chordStartTime + chordData.duration);
 
-              gain.gain.setValueAtTime(0, noteStartTime);
-              gain.gain.linearRampToValueAtTime(0.25, noteStartTime + 0.04);
-              gain.gain.setValueAtTime(0.2, noteStartTime + item.duration - 0.05);
-              gain.gain.exponentialRampToValueAtTime(0.001, noteStartTime + item.duration);
+                gain.gain.setValueAtTime(0, chordStartTime);
+                gain.gain.linearRampToValueAtTime(0.18, chordStartTime + 0.05);
+                gain.gain.setValueAtTime(0.15, chordStartTime + chordData.duration - 0.1);
+                gain.gain.exponentialRampToValueAtTime(0.001, chordStartTime + chordData.duration);
 
-              osc.connect(filter);
-              filter.connect(gain);
-              gain.connect(ctx.destination);
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(ctx.destination);
 
-              osc.start(noteStartTime);
-              osc.stop(noteStartTime + item.duration);
+                osc.start(chordStartTime);
+                osc.stop(chordStartTime + chordData.duration);
+              });
             });
 
-            timeOffset += item.duration * 0.85;
+            currentTimeOffset += chordData.duration * 0.9;
           });
         } catch (e) {
           console.warn("Fanfare error:", e);
@@ -807,20 +818,34 @@
             <header className="relative z-20 border-b border-amber-500/20 bg-slate-950/80 px-6 py-3.5 flex-shrink-0">
               <div className="w-full flex flex-row items-center justify-between gap-4">
                 
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gradient-to-br from-amber-400 to-yellow-600 rounded-xl shadow-md shadow-amber-500/20 text-slate-950 animate-pulse">
-                    <Crown className="w-6 h-6 stroke-[2.5]" />
+                <div className="flex items-center gap-4">
+                  <div className="bg-white/95 px-2.5 py-1.5 rounded-xl shadow-md border border-amber-500/30 flex items-center justify-center">
+                    <img 
+                      src="SLT-Mobiteal-PEO-TV_LOGO (1).png" 
+                      alt="SLT-Mobitel PEO TV Logo" 
+                      className="h-8 w-auto object-contain"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = "https://placehold.co/120x40/ffffff/004080?text=PEO+TV";
+                      }}
+                    />
                   </div>
-                  <div>
-                    <h1 className="text-lg sm:text-xl font-extrabold tracking-wider bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-500 bg-clip-text text-transparent uppercase leading-tight flex items-center gap-2">
-                      PEO Retro King
-                      {isCloudConnected && (
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" title="Live Cloud Sync Active"></span>
-                      )}
-                    </h1>
-                    <p className="text-[10px] text-amber-400/80 tracking-widest uppercase font-semibold flex items-center gap-1">
-                      Role: <span className="text-white font-extrabold px-1.5 py-0.2 rounded bg-amber-500/20 border border-amber-500/30">{userRole}</span> • {isCloudConnected ? '🟢 Live Cloud Synced' : '🟡 Connecting...'}
-                    </p>
+
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-gradient-to-br from-amber-400 to-yellow-600 rounded-xl shadow-md shadow-amber-500/20 text-slate-950 animate-pulse">
+                      <Crown className="w-6 h-6 stroke-[2.5]" />
+                    </div>
+                    <div>
+                      <h1 className="text-lg sm:text-xl font-extrabold tracking-wider bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-500 bg-clip-text text-transparent uppercase leading-tight flex items-center gap-2">
+                        PEO Retro King
+                        {isCloudConnected && (
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" title="Live Cloud Sync Active"></span>
+                        )}
+                      </h1>
+                      <p className="text-[10px] text-amber-400/80 tracking-widest uppercase font-semibold flex items-center gap-1">
+                        Role: <span className="text-white font-extrabold px-1.5 py-0.2 rounded bg-amber-500/20 border border-amber-500/30">{userRole}</span> • {isCloudConnected ? '🟢 Live Cloud Synced' : '🟡 Connecting...'}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
