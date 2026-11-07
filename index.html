@@ -175,30 +175,30 @@ export default function App() {
     return audioCtxRef.current;
   };
 
-  // Heartbeat Synthesizer: Sharp transient pitch double beat ("Lub-Dub")
+  // Realistic Double-Beat Heartbeat Synthesizer ("Lub-Dub")
   const playHeartbeatSound = (step) => {
     if (!soundEnabled) return;
     try {
       const ctx = getAudioContext();
       const now = ctx.currentTime;
 
-      // Accelerate urgency as step goes from 10 to 1
-      const gainMult = 1 + (10 - step) * 0.08;
+      // Accelerate urgency and volume boost as countdown reaches 1
+      const urgencyMult = 1 + (10 - step) * 0.08;
 
-      // --- LUB (1st beat) ---
+      // --- LUB (First heartbeat beat - lower pitch, heavy sub-bass impact) ---
       const osc1 = ctx.createOscillator();
       const gain1 = ctx.createGain();
       const filter1 = ctx.createBiquadFilter();
 
       osc1.type = 'sine';
-      osc1.frequency.setValueAtTime(90, now);
-      osc1.frequency.exponentialRampToValueAtTime(45, now + 0.12);
+      osc1.frequency.setValueAtTime(80, now);
+      osc1.frequency.exponentialRampToValueAtTime(40, now + 0.12);
 
       filter1.type = 'lowpass';
-      filter1.frequency.setValueAtTime(150, now);
+      filter1.frequency.setValueAtTime(130, now);
 
       gain1.gain.setValueAtTime(0, now);
-      gain1.gain.linearRampToValueAtTime(0.9 * gainMult, now + 0.02);
+      gain1.gain.linearRampToValueAtTime(1.0 * urgencyMult, now + 0.02);
       gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
 
       osc1.connect(filter1);
@@ -208,21 +208,21 @@ export default function App() {
       osc1.start(now);
       osc1.stop(now + 0.15);
 
-      // --- DUB (2nd beat - slightly higher & offset by 0.15s) ---
+      // --- DUB (Second heartbeat beat - slightly higher pitch, offset by 0.15s) ---
+      const dubTime = now + 0.14;
       const osc2 = ctx.createOscillator();
       const gain2 = ctx.createGain();
       const filter2 = ctx.createBiquadFilter();
 
-      const dubTime = now + 0.14;
       osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(110, dubTime);
-      osc2.frequency.exponentialRampToValueAtTime(50, dubTime + 0.15);
+      osc2.frequency.setValueAtTime(100, dubTime);
+      osc2.frequency.exponentialRampToValueAtTime(45, dubTime + 0.14);
 
       filter2.type = 'lowpass';
-      filter2.frequency.setValueAtTime(160, dubTime);
+      filter2.frequency.setValueAtTime(150, dubTime);
 
       gain2.gain.setValueAtTime(0, dubTime);
-      gain2.gain.linearRampToValueAtTime(1.1 * gainMult, dubTime + 0.02);
+      gain2.gain.linearRampToValueAtTime(1.2 * urgencyMult, dubTime + 0.02);
       gain2.gain.exponentialRampToValueAtTime(0.001, dubTime + 0.16);
 
       osc2.connect(filter2);
