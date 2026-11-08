@@ -140,10 +140,7 @@
       const [showScoresInLeaderboard, setShowScoresInLeaderboard] = useState(false);
       const [soundEnabled, setSoundEnabled] = useState(true);
 
-      const canvasRef = useRef(null);
-      const audioCtxRef = useRef(null);
-      const stageAmbienceIntervalRef = useRef(null);
-
+      /* Reveal Modal State */
       const [revealModal, setRevealModal] = useState({
         isOpen: false,
         title: '',
@@ -153,58 +150,8 @@
         isCounting: false
       });
 
-      // Ambient Stage Background Music for Winners tab
-      useEffect(() => {
-        if (activeTab === 'stage' && soundEnabled) {
-          const playStageAmbience = () => {
-            try {
-              const ctx = getAudioContext();
-              const now = ctx.currentTime;
-              const chordFreqs = [130.81, 196.00, 261.63, 329.63]; // C3, G3, C4, E4 ambient pad
-
-              chordFreqs.forEach((freq, idx) => {
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                const filter = ctx.createBiquadFilter();
-
-                osc.type = idx % 2 === 0 ? 'sine' : 'triangle';
-                osc.frequency.setValueAtTime(freq, now);
-
-                filter.type = 'lowpass';
-                filter.frequency.setValueAtTime(400, now);
-
-                gain.gain.setValueAtTime(0, now);
-                gain.gain.linearRampToValueAtTime(0.04, now + 1.5);
-                gain.gain.linearRampToValueAtTime(0, now + 4.0);
-
-                osc.connect(filter);
-                filter.connect(gain);
-                gain.connect(ctx.destination);
-
-                osc.start(now);
-                osc.stop(now + 4.2);
-              });
-            } catch (e) {
-              console.warn("Ambience audio error:", e);
-            }
-          };
-
-          playStageAmbience();
-          stageAmbienceIntervalRef.current = setInterval(playStageAmbience, 5000);
-        } else {
-          if (stageAmbienceIntervalRef.current) {
-            clearInterval(stageAmbienceIntervalRef.current);
-            stageAmbienceIntervalRef.current = null;
-          }
-        }
-
-        return () => {
-          if (stageAmbienceIntervalRef.current) {
-            clearInterval(stageAmbienceIntervalRef.current);
-            stageAmbienceIntervalRef.current = null;
-          }
-        };
-      }, [activeTab, soundEnabled]);
+      const canvasRef = useRef(null);
+      const audioCtxRef = useRef(null);
 
       const handleSelectRole = (role) => {
         setUserRole(role);
@@ -884,13 +831,29 @@
       }
 
       return (
-        <div className="min-h-screen bg-slate-950 text-slate-100 font-sans relative flex items-center justify-center p-2 sm:p-4 overflow-x-hidden select-none">
+        <div className={`min-h-screen bg-slate-950 text-slate-100 font-sans relative flex items-center justify-center p-2 sm:p-4 overflow-x-hidden select-none transition-all duration-1000 ${
+          revealModal.isOpen && !revealModal.isCounting ? 'bg-gradient-to-b from-slate-950 via-blue-950 to-slate-950 scale-[1.01]' : ''
+        }`}>
+          {/* Full Page Stage Animated Backdrop when Winner is Revealed */}
+          {revealModal.isOpen && !revealModal.isCounting && (
+            <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+              {/* Dynamic Animated Light Beams */}
+              <div className="absolute top-0 left-1/4 w-96 h-[120vh] bg-gradient-to-b from-cyan-400/20 via-blue-500/10 to-transparent -rotate-45 blur-2xl animate-pulse"></div>
+              <div className="absolute top-0 right-1/4 w-96 h-[120vh] bg-gradient-to-b from-green-400/20 via-cyan-500/10 to-transparent rotate-45 blur-2xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120vw] h-[120vh] bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-cyan-500/20 via-green-500/10 to-transparent animate-ping" style={{ animationDuration: '4s' }}></div>
+            </div>
+          )}
+
           <div className="fixed inset-0 pointer-events-none opacity-20 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-500 via-blue-950 to-slate-950"></div>
           <div className="fixed -top-40 -left-40 w-96 h-96 bg-blue-600 rounded-full blur-[140px] pointer-events-none opacity-30"></div>
           <div className="fixed -bottom-40 -right-40 w-96 h-96 bg-green-500 rounded-full blur-[140px] pointer-events-none opacity-20"></div>
 
           {/* LOCKED 16:9 ASPECT RATIO WIDESCREEN FRAME */}
-          <div className="w-full max-w-[1600px] aspect-[16/9] bg-slate-900/95 border border-cyan-500/30 rounded-3xl shadow-2xl overflow-hidden flex flex-col relative z-10 backdrop-blur-xl">
+          <div className={`w-full max-w-[1600px] aspect-[16/9] bg-slate-900/95 border rounded-3xl shadow-2xl overflow-hidden flex flex-col relative z-10 backdrop-blur-xl transition-all duration-700 ${
+            revealModal.isOpen && !revealModal.isCounting
+              ? 'border-cyan-400 ring-4 ring-cyan-500/30 shadow-[0_0_80px_rgba(0,174,235,0.4)] scale-[0.98]'
+              : 'border-cyan-500/30'
+          }`}>
         
         <header className="relative z-20 border-b border-cyan-500/20 bg-slate-950/90 px-6 py-3 flex-shrink-0">
           <div className="w-full flex flex-row items-center justify-between gap-4">
@@ -1592,13 +1555,13 @@
               </div>
             ) : (
               <div className="space-y-5 animate-in fade-in zoom-in duration-700 transition-transform">
-                <div className="inline-flex items-center gap-2 px-5 py-1.5 rounded-full bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 text-xs font-bold uppercase tracking-widest animate-bounce">
+                <div className="inline-flex items-center gap-2 px-5 py-1.5 rounded-full bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 text-xs font-bold uppercase tracking-widest">
                   <Sparkles className="w-4 h-4 text-cyan-400" />
                   {revealModal.title}
                 </div>
 
                 <div className="space-y-1">
-                  <h4 className="text-xs uppercase tracking-widest text-slate-400 font-semibold animate-pulse">
+                  <h4 className="text-xs uppercase tracking-widest text-slate-400 font-semibold">
                     Congratulations To Contestant #{revealModal.contestant.id}!
                   </h4>
                   <h1 className="text-3xl sm:text-5xl font-black bg-gradient-to-r from-cyan-200 via-blue-100 to-green-400 bg-clip-text text-transparent tracking-wide leading-tight drop-shadow-[0_10px_20px_rgba(0,174,235,0.4)]">
@@ -1606,19 +1569,19 @@
                   </h1>
                 </div>
 
-                <div className="relative w-36 h-36 mx-auto my-4 flex items-center justify-center animate-[spin_6s_linear_infinite]" style={{ transformStyle: 'preserve-3d' }}>
-                  <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 via-blue-500 to-green-500 rounded-full blur-2xl opacity-90 animate-pulse"></div>
-                  <div className="relative w-full h-full bg-slate-950 border-4 border-cyan-400 rounded-full flex items-center justify-center shadow-2xl overflow-hidden scale-110">
+                <div className="relative w-36 h-36 mx-auto my-4 flex items-center justify-center">
+                  <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 via-blue-500 to-green-500 rounded-full blur-2xl opacity-90"></div>
+                  <div className="relative w-full h-full bg-slate-950 border-4 border-cyan-400 rounded-full flex items-center justify-center shadow-2xl overflow-hidden">
                     {revealModal.contestant.photo ? (
                       <img src={revealModal.contestant.photo} alt={revealModal.contestant.name} className="w-full h-full object-cover" />
                     ) : (
-                      <Crown className="w-16 h-16 text-cyan-400 stroke-[2.5] animate-bounce" />
+                      <Crown className="w-16 h-16 text-cyan-400 stroke-[2.5]" />
                     )}
                   </div>
                 </div>
 
                 <div className="flex justify-center gap-2 text-xs text-cyan-300 font-bold uppercase tracking-widest">
-                  <span className="px-3 py-1 bg-cyan-500/20 rounded-lg border border-cyan-500/40 animate-pulse">👑 Grand Official Finalist</span>
+                  <span className="px-3 py-1 bg-cyan-500/20 rounded-lg border border-cyan-500/40">👑 Grand Official Finalist</span>
                 </div>
 
                 <button
