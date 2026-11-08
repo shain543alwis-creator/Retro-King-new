@@ -518,59 +518,124 @@
         }
       };
 
-      const playTrumpetFanfare = (rank) => {
+      // Realistic Drum Roll & Cymbal Crash Victory Audio Cue
+      const playDrumRollReveal = (rank) => {
         if (!soundEnabled) return;
         try {
           const ctx = getAudioContext();
           const now = ctx.currentTime;
 
-          const chords = rank === 1 ? [
-            { freqs: [261.63, 329.63, 392.00, 523.25], duration: 0.3 },
-            { freqs: [293.66, 369.99, 440.00, 587.33], duration: 0.3 },
-            { freqs: [329.63, 415.30, 493.88, 659.25], duration: 0.3 },
-            { freqs: [523.25, 659.25, 783.99, 1046.50], duration: 1.2 }
-          ] : [
-            { freqs: [220.00, 277.18, 329.63, 440.00], duration: 0.4 },
-            { freqs: [261.63, 329.63, 392.00, 523.25], duration: 0.4 },
-            { freqs: [329.63, 415.30, 493.88, 659.25], duration: 0.9 }
-          ];
+          // 1. DYNAMIC ACCELERATING DRUM ROLL (Snare hits building in pitch, volume & velocity)
+          const rollDuration = 2.2;
+          const totalHits = 45;
+          
+          for (let i = 0; i < totalHits; i++) {
+            const hitTime = now + (Math.pow(i / totalHits, 0.85) * rollDuration);
+            const progress = i / totalHits;
+            const volume = 0.05 + Math.pow(progress, 2) * 0.4;
+            const pitch = 160 + progress * 80;
 
-          let currentTimeOffset = 0;
+            // Snare Body
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(pitch, hitTime);
+            osc.frequency.exponentialRampToValueAtTime(60, hitTime + 0.04);
 
-          chords.forEach((chordData) => {
-            const chordStartTime = now + currentTimeOffset;
-            chordData.freqs.forEach((freq) => {
-              [-4, 4].forEach((detuneVal) => {
-                const osc = ctx.createOscillator();
-                const filter = ctx.createBiquadFilter();
-                const gain = ctx.createGain();
+            gain.gain.setValueAtTime(volume, hitTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, hitTime + 0.045);
 
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(freq, chordStartTime);
-                osc.detune.setValueAtTime(detuneVal, chordStartTime);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(hitTime);
+            osc.stop(hitTime + 0.05);
 
-                filter.type = 'lowpass';
-                filter.frequency.setValueAtTime(freq * 1.8, chordStartTime);
-                filter.frequency.exponentialRampToValueAtTime(freq * 3.5, chordStartTime + 0.1);
-                filter.frequency.exponentialRampToValueAtTime(freq * 2, chordStartTime + chordData.duration);
+            // Snare Wire Noise Crackle
+            const bufferSize = ctx.sampleRate * 0.04;
+            const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let k = 0; k < bufferSize; k++) {
+              data[k] = Math.random() * 2 - 1;
+            }
 
-                gain.gain.setValueAtTime(0, chordStartTime);
-                gain.gain.linearRampToValueAtTime(0.18, chordStartTime + 0.05);
-                gain.gain.setValueAtTime(0.15, chordStartTime + chordData.duration - 0.1);
-                gain.gain.exponentialRampToValueAtTime(0.001, chordStartTime + chordData.duration);
+            const noise = ctx.createBufferSource();
+            noise.buffer = buffer;
+            const noiseFilter = ctx.createBiquadFilter();
+            noiseFilter.type = 'highpass';
+            noiseFilter.frequency.setValueAtTime(1500, hitTime);
 
-                osc.connect(filter);
-                filter.connect(gain);
-                gain.connect(ctx.destination);
+            const noiseGain = ctx.createGain();
+            noiseGain.gain.setValueAtTime(volume * 0.7, hitTime);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, hitTime + 0.04);
 
-                osc.start(chordStartTime);
-                osc.stop(chordStartTime + chordData.duration);
-              });
-            });
-            currentTimeOffset += chordData.duration * 0.9;
+            noise.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            noiseGain.connect(ctx.destination);
+            noise.start(hitTime);
+            noise.stop(hitTime + 0.045);
+          }
+
+          // 2. GRAND CRASH CYMBAL & VICTORY STAB AT PEAK REVEAL MOMENT
+          const crashTime = now + rollDuration;
+
+          // Cymbal Burst Noise
+          const crashLength = ctx.sampleRate * 2.0;
+          const crashBuf = ctx.createBuffer(1, crashLength, ctx.sampleRate);
+          const cData = crashBuf.getChannelData(0);
+          for (let i = 0; i < crashLength; i++) {
+            cData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.45));
+          }
+
+          const crashNoise = ctx.createBufferSource();
+          crashNoise.buffer = crashBuf;
+          const crashFilter = ctx.createBiquadFilter();
+          crashFilter.type = 'highpass';
+          crashFilter.frequency.setValueAtTime(3500, crashTime);
+
+          const crashGain = ctx.createGain();
+          crashGain.gain.setValueAtTime(0.85, crashTime);
+          crashGain.gain.exponentialRampToValueAtTime(0.001, crashTime + 1.8);
+
+          crashNoise.connect(crashFilter);
+          crashFilter.connect(crashGain);
+          crashGain.connect(ctx.destination);
+          crashNoise.start(crashTime);
+          crashNoise.stop(crashTime + 1.9);
+
+          // Deep Bass Hit / Kick Drum Impact
+          const kickOsc = ctx.createOscillator();
+          const kickGain = ctx.createGain();
+          kickOsc.type = 'sine';
+          kickOsc.frequency.setValueAtTime(140, crashTime);
+          kickOsc.frequency.exponentialRampToValueAtTime(35, crashTime + 0.25);
+          
+          kickGain.gain.setValueAtTime(1.0, crashTime);
+          kickGain.gain.exponentialRampToValueAtTime(0.001, crashTime + 0.35);
+
+          kickOsc.connect(kickGain);
+          kickGain.connect(ctx.destination);
+          kickOsc.start(crashTime);
+          kickOsc.stop(crashTime + 0.4);
+
+          // Majestic Brass Accord Chord Finish
+          const chordFreqs = rank === 1 ? [261.63, 329.63, 392.00, 523.25, 659.25] : [220.00, 277.18, 329.63, 440.00];
+          chordFreqs.forEach((freq) => {
+            const brassOsc = ctx.createOscillator();
+            const brassGain = ctx.createGain();
+            brassOsc.type = 'sawtooth';
+            brassOsc.frequency.setValueAtTime(freq, crashTime);
+            
+            brassGain.gain.setValueAtTime(0.2, crashTime);
+            brassGain.gain.exponentialRampToValueAtTime(0.001, crashTime + 1.5);
+
+            brassOsc.connect(brassGain);
+            brassGain.connect(ctx.destination);
+            brassOsc.start(crashTime);
+            brassOsc.stop(crashTime + 1.6);
           });
+
         } catch (e) {
-          console.warn("Fanfare error:", e);
+          console.warn("Drum roll audio error:", e);
         }
       };
 
@@ -640,7 +705,7 @@
             }, 1000);
           } else {
             setRevealModal(prev => ({ ...prev, isCounting: false }));
-            playTrumpetFanfare(revealModal.rank);
+            playDrumRollReveal(revealModal.rank);
           }
         }
         return () => clearTimeout(timer);
