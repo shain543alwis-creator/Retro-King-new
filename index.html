@@ -138,10 +138,11 @@
       const [customRevealAudio, setCustomRevealAudio] = useState(() => localStorage.getItem('peo_audio_reveal') || null);
 
       /* TOP 5 STAGE FLOW STATES */
-      const [showTop5, setShowTop5] = useState(false);
       const [shuffledTop5, setShuffledTop5] = useState([]);
+      const [top5Revealed, setTop5Revealed] = useState(false);
+      const [isRevealingTop5, setIsRevealingTop5] = useState(false);
 
-      // State to delay showing the winner details for 5 seconds after reveal begins
+      // State to delay showing the winner details for 5 seconds after countdown completes
       const [showWinnerDetails, setShowWinnerDetails] = useState(false);
 
       const [newContestantName, setNewContestantName] = useState('');
@@ -164,10 +165,6 @@
         countdown: 10,
         isCounting: false
       });
-
-      /* NEW: State to track if Top 5 has been revealed on Winners Stage */
-      const [top5Revealed, setTop5Revealed] = useState(false);
-      const [isRevealingTop5, setIsRevealingTop5] = useState(false);
 
       const audioCtxRef = useRef(null);
       const canvasRef = useRef(null);
@@ -541,13 +538,11 @@
         });
       };
 
-      /* NEW: Function to handle initial Top 5 Shuffled Reveal */
       const handleRevealTop5 = () => {
         setIsRevealingTop5(true);
         playDrumRollReveal();
 
         const top5 = getLeaderboard().slice(0, 5);
-        // Fisher-Yates random shuffle
         const shuffled = [...top5].sort(() => Math.random() - 0.5);
 
         setTimeout(() => {
@@ -581,507 +576,232 @@
           textDelayTimer = setTimeout(() => {
             setShowWinnerDetails(true);
           }, 5000);
+        } else {
+          setShowWinnerDetails(false);
         }
         return () => clearTimeout(textDelayTimer);
       }, [revealModal.isOpen, revealModal.isCounting]);
 
       const selectedContestant = contestants.find(c => c.id === selectedContestantId) || contestants[0];
 
+      if (!userRole) {
+        return (
+          <div className="min-h-screen bg-slate-950 text-slate-100 font-sans relative flex items-center justify-center p-4 overflow-hidden">
+            <div className="fixed inset-0 pointer-events-none opacity-20 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-500 via-blue-950 to-slate-950"></div>
+            
+            <div className="relative z-10 w-full max-w-lg bg-slate-900/90 border border-cyan-500/30 rounded-3xl p-8 shadow-2xl backdrop-blur-xl text-center space-y-6">
+              <div className="bg-white px-4 py-2.5 rounded-2xl shadow-lg border border-cyan-500/30 flex items-center justify-center mx-auto max-w-[240px]">
+                <img 
+                  src={customLogo} 
+                  alt="Event Logo" 
+                  className="h-9 w-auto object-contain"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = "https://placehold.co/180x50/ffffff/004080?text=PEO+TV";
+                  }}
+                />
+              </div>
+
+              <div>
+                <h1 className="text-2xl font-black uppercase tracking-wider bg-gradient-to-r from-cyan-400 via-blue-200 to-green-400 bg-clip-text text-transparent">
+                  PEO Retro King Portal
+                </h1>
+                <p className="text-xs text-slate-400 mt-1">
+                  Select your portal role to access your workspace.
+                </p>
+              </div>
+
+              <div className="space-y-3 pt-2">
+                <div className="text-[10px] font-bold text-cyan-400/80 uppercase tracking-widest text-left px-1">
+                  Judges Access Panel
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-48 overflow-y-auto pr-1">
+                  {judges.map(j => (
+                    <button
+                      key={j}
+                      onClick={() => handleSelectRole(j)}
+                      className="py-3 px-2 bg-slate-950 border border-slate-800 hover:border-cyan-500/50 hover:bg-slate-900 rounded-xl text-xs font-bold text-slate-200 hover:text-cyan-300 transition-all flex flex-col items-center gap-1.5 shadow-md truncate"
+                    >
+                      <UserCheck className="w-4 h-4 text-cyan-400 shrink-0" />
+                      <span className="truncate w-full">{j}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="pt-4 text-[10px] font-bold text-green-400/80 uppercase tracking-widest text-left px-1">
+                  Event Organizer / Admin Access
+                </div>
+                <button
+                  onClick={() => handleSelectRole('Admin')}
+                  className="w-full py-3.5 bg-gradient-to-r from-blue-600 via-cyan-600 to-green-600 hover:from-blue-500 hover:to-green-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider"
+                >
+                  <ShieldCheck className="w-4 h-4" /> Admin & MC Master Console
+                </button>
+              </div>
+
+              <div className="text-[10px] text-slate-500 pt-2">
+                SLT-Mobitel PEO TV Realtime Cloud System
+              </div>
+            </div>
+          </div>
+        );
+      }
+
       return (
-        <div className={`min-h-screen bg-slate-950 text-slate-100 font-sans relative flex items-center justify-center p-2 sm:p-4 overflow-x-hidden select-none transition-all duration-1000 ${
-          revealModal.isOpen && !revealModal.isCounting ? 'bg-slate-900 border-4 border-cyan-400' : ''
-        }`}>
-          
+        <div className="min-h-screen bg-slate-950 text-slate-100 font-sans relative flex items-center justify-center p-2 sm:p-4 overflow-x-hidden select-none">
           <div className="fixed inset-0 pointer-events-none opacity-20 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-500 via-blue-950 to-slate-950"></div>
 
-          <div className="w-full max-w-7xl aspect-[16/9] bg-slate-900/90 border border-cyan-500/30 rounded-3xl shadow-2xl overflow-hidden flex flex-col relative z-10 backdrop-blur-xl">
+          {/* Locked 16:9 Frame Container */}
+          <div className="w-full max-w-[1600px] aspect-[16/9] bg-slate-900/95 border border-cyan-500/30 rounded-3xl shadow-2xl overflow-hidden flex flex-col relative z-10 backdrop-blur-xl">
             
-            {/* Header Navigation */}
-            <header className="relative z-20 border-b border-cyan-500/20 bg-slate-950/80 px-6 py-3 flex-shrink-0">
+            <header className="relative z-20 border-b border-cyan-500/20 bg-slate-950/90 px-6 py-3 flex-shrink-0">
               <div className="w-full flex flex-row items-center justify-between gap-4">
-                
-                <div className="flex items-center gap-3">
-                  <div className="bg-white px-3 py-1 rounded-xl border border-cyan-500/30 shadow-md h-10 flex items-center justify-center">
-                    <img 
-                      src={customLogo} 
-                      alt="SLT-Mobitel PEO TV Logo" 
-                      className="h-8 w-auto object-contain"
-                      onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = "https://placehold.co/180x50/ffffff/004080?text=PEO+TV";
-                      }}
-                    />
+                <div className="flex items-center gap-4">
+                  <div className="bg-white px-3 py-1.5 rounded-xl shadow-md border border-cyan-500/30 flex items-center justify-center max-w-[160px]">
+                    <img src={customLogo} alt="Event Logo" className="h-8 w-auto object-contain" />
+                  </div>
+                  <div>
+                    <h1 className="text-lg font-extrabold tracking-wider bg-gradient-to-r from-cyan-300 via-blue-200 to-green-400 bg-clip-text text-transparent uppercase leading-tight">
+                      PEO Retro King
+                    </h1>
+                    <p className="text-[10px] text-cyan-400/80 tracking-widest uppercase font-semibold">
+                      Active Role: <span className="text-white font-extrabold">{userRole}</span>
+                    </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  {!userRole ? (
-                    <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <button
+                    onClick={() => setSoundEnabled(!soundEnabled)}
+                    className="p-2 bg-slate-900 border border-cyan-500/30 rounded-xl text-cyan-400 hover:bg-slate-800 text-xs font-bold"
+                  >
+                    {soundEnabled ? <Volume2 className="w-4 h-4 text-green-400" /> : <VolumeX className="w-4 h-4 text-slate-500" />}
+                  </button>
+
+                  <nav className="flex items-center gap-1 bg-slate-950/90 p-1 rounded-xl border border-cyan-500/20">
+                    {userRole === 'Admin' && (
                       <button
-                        onClick={() => handleSelectRole('Admin')}
-                        className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-cyan-400 border border-cyan-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5"
+                        onClick={() => { stopCamera(); setActiveTab('admin'); }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold ${activeTab === 'admin' ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950' : 'text-slate-400'}`}
                       >
-                        <ShieldCheck className="w-3.5 h-3.5" /> Admin
+                        Admin Setup
                       </button>
-                      <button
-                        onClick={() => handleSelectRole('Judge 1')}
-                        className="px-3 py-1.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 rounded-xl text-xs font-bold flex items-center gap-1.5"
-                      >
-                        <UserCheck className="w-3.5 h-3.5" /> Judge Sign In
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2 bg-slate-950 px-3 py-1 rounded-xl border border-slate-800 text-xs">
-                        <span className="text-slate-400">Role:</span>
-                        <span className="font-bold text-cyan-400">{userRole}</span>
-                        <button onClick={handleLogout} className="text-slate-500 hover:text-red-400 ml-1">
-                          <LogOut className="w-3.5 h-3.5" />
+                    )}
+
+                    <button
+                      onClick={() => { stopCamera(); setActiveTab('judging'); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold ${activeTab === 'judging' ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950' : 'text-slate-400'}`}
+                    >
+                      Judges Marking
+                    </button>
+
+                    <button
+                      onClick={() => { stopCamera(); setActiveTab('live'); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold ${activeTab === 'live' ? 'bg-gradient-to-r from-green-400 to-cyan-500 text-slate-950' : 'text-green-400'}`}
+                    >
+                      Live Leaderboard
+                    </button>
+
+                    {userRole === 'Admin' && (
+                      <>
+                        <button
+                          onClick={() => { stopCamera(); setActiveTab('results'); }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold ${activeTab === 'results' ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950' : 'text-slate-400'}`}
+                        >
+                          Leaderboard
                         </button>
-                      </div>
+                        <button
+                          onClick={() => { stopCamera(); setActiveTab('stage'); }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold ${activeTab === 'stage' ? 'bg-gradient-to-r from-blue-600 via-cyan-600 to-green-600 text-white' : 'text-cyan-300'}`}
+                        >
+                          Winners
+                        </button>
+                      </>
+                    )}
+                  </nav>
 
-                      {userRole === 'Admin' && (
-                        <nav className="flex items-center gap-1 bg-slate-950/90 p-1 rounded-xl border border-cyan-500/20">
-                          <button
-                            onClick={() => { stopCamera(); setActiveTab('admin'); }}
-                            className={`flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold ${
-                              activeTab === 'admin' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400'
-                            }`}
-                          >
-                            Admin Setup
-                          </button>
-                          <button
-                            onClick={() => { stopCamera(); setActiveTab('judging'); }}
-                            className={`flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold ${
-                              activeTab === 'judging' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400'
-                            }`}
-                          >
-                            Marking
-                          </button>
-                          <button
-                            onClick={() => { stopCamera(); setActiveTab('results'); }}
-                            className={`flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold ${
-                              activeTab === 'results' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400'
-                            }`}
-                          >
-                            Live Leaderboard
-                          </button>
-                          <button
-                            onClick={() => { stopCamera(); setActiveTab('stage'); }}
-                            className={`flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold ${
-                              activeTab === 'stage' ? 'bg-green-500 text-slate-950' : 'text-slate-400'
-                            }`}
-                          >
-                            Winners
-                          </button>
-                        </nav>
-                      )}
-                    </div>
-                  )}
+                  <button
+                    onClick={handleLogout}
+                    className="p-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-400 hover:text-red-400"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
                 </div>
-
               </div>
             </header>
 
-            {/* Main Content View Container */}
             <main className="relative z-10 flex-1 overflow-y-auto p-4 sm:p-6">
-              
-              {/* ADMIN SETUP TAB */}
+              {/* ADMIN TAB */}
               {activeTab === 'admin' && userRole === 'Admin' && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
-                  <div className="lg:col-span-5 space-y-4">
-                    
-                    {/* MEDIA UPLOADS SETUP */}
-                    <div className="bg-slate-950/80 border border-cyan-500/20 rounded-2xl p-4 shadow-xl space-y-3">
-                      <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                        <Upload className="w-4 h-4 text-cyan-400" />
-                        Custom Audio Clips & Celebration Videos
-                      </h3>
-                      <div className="space-y-2 text-xs">
-                        <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between gap-2">
-                          <div>
-                            <div className="font-bold text-slate-200 text-[11px]">Countdown Heartbeat Audio</div>
-                            <div className="text-[9px] text-slate-400">{customCountdownAudio ? '✓ Custom Audio Set' : 'Default Beat'}</div>
-                          </div>
-                          <label className="px-2.5 py-1 bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 rounded-lg text-[10px] font-bold cursor-pointer shrink-0">
-                            Upload Audio
-                            <input type="file" accept="audio/*" onChange={(e) => handleMediaUpload(e, 'peo_audio_countdown', setCustomCountdownAudio, 'settings/audio_countdown')} className="hidden" />
-                          </label>
+                  <div className="lg:col-span-6 space-y-4">
+                    <div className="bg-slate-950/80 border border-cyan-500/20 rounded-2xl p-4 shadow-xl">
+                      <h3 className="text-sm font-bold text-white mb-2">Media Center & Audio / Video Animations</h3>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-cyan-400 uppercase mb-1">Countdown Video (MP4)</label>
+                          <input type="file" accept="video/*" onChange={(e) => handleVideoUpload(e, 'peo_video_countdown', setCustomCountdownVideo, 'settings/countdown_video')} className="text-xs text-slate-400" />
                         </div>
-
-                        <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between gap-2">
-                          <div>
-                            <div className="font-bold text-slate-200 text-[11px]">Winner Reveal Drum Roll</div>
-                            <div className="text-[9px] text-slate-400">{customRevealAudio ? '✓ Custom Audio Set' : 'Default Drum Roll'}</div>
-                          </div>
-                          <label className="px-2.5 py-1 bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 rounded-lg text-[10px] font-bold cursor-pointer shrink-0">
-                            Upload Audio
-                            <input type="file" accept="audio/*" onChange={(e) => handleMediaUpload(e, 'peo_audio_reveal', setCustomRevealAudio, 'settings/audio_reveal')} className="hidden" />
-                          </label>
-                        </div>
-
-                        <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between gap-2">
-                          <div>
-                            <div className="font-bold text-slate-200 text-[11px]">Countdown Video Animation</div>
-                            <div className="text-[9px] text-slate-400">{customCountdownVideo ? '✓ Custom Video Set' : 'Standard'}</div>
-                          </div>
-                          <label className="px-2.5 py-1 bg-purple-500/20 text-purple-300 border border-purple-500/40 rounded-lg text-[10px] font-bold cursor-pointer shrink-0">
-                            Upload MP4
-                            <input type="file" accept="video/*" onChange={(e) => handleMediaUpload(e, 'peo_video_countdown', setCustomCountdownVideo, 'settings/video_countdown')} className="hidden" />
-                          </label>
-                        </div>
-
-                        <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between gap-2">
-                          <div>
-                            <div className="font-bold text-slate-200 text-[11px]">Winner Stage Celebration Video</div>
-                            <div className="text-[9px] text-slate-400">{customWinnerVideo ? '✓ Custom Video Set' : 'Standard'}</div>
-                          </div>
-                          <label className="px-2.5 py-1 bg-green-500/20 text-green-300 border border-green-500/40 rounded-lg text-[10px] font-bold cursor-pointer shrink-0">
-                            Upload MP4
-                            <input type="file" accept="video/*" onChange={(e) => handleMediaUpload(e, 'peo_video_winner', setCustomWinnerVideo, 'settings/video_winner')} className="hidden" />
-                          </label>
+                        <div>
+                          <label className="block text-[10px] font-bold text-cyan-400 uppercase mb-1">Winner Celebration Video (MP4)</label>
+                          <input type="file" accept="video/*" onChange={(e) => handleVideoUpload(e, 'peo_video_winner', setCustomWinnerVideo, 'settings/winner_video')} className="text-xs text-slate-400" />
                         </div>
                       </div>
-                    </div>
-
-                    {/* EVENT LOGO SETUP */}
-                    <div className="bg-slate-950/80 border border-cyan-500/20 rounded-2xl p-4 shadow-xl">
-                      <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-2">
-                        <Upload className="w-4 h-4 text-cyan-400" />
-                        Customize Event Logo
-                      </h3>
-                      <div className="flex items-center gap-3 mt-3">
-                        <div className="bg-white px-3 py-1 rounded-lg border border-cyan-500/30 h-10 flex items-center justify-center shrink-0 max-w-[120px]">
-                          <img src={customLogo} alt="Logo" className="h-7 w-auto object-contain" />
-                        </div>
-                        <label className="flex-1 py-2 px-3 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-xs font-bold text-cyan-300 cursor-pointer flex items-center justify-center gap-2">
-                          <Upload className="w-3.5 h-3.5" /> Choose Logo File
-                          <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="bg-slate-950/80 border border-cyan-500/20 rounded-2xl p-4 shadow-xl">
-                      <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-                        <Plus className="w-4 h-4 text-cyan-400" />
-                        Enroll Contestant & Live Avatar
-                      </h3>
-                      <form onSubmit={handleAddContestant} className="space-y-2.5">
-                        <input
-                          type="text"
-                          value={newContestantName}
-                          onChange={(e) => setNewContestantName(e.target.value)}
-                          placeholder="Enter contestant full name"
-                          className="w-full bg-slate-900 border border-slate-700 focus:border-cyan-500 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-600 focus:outline-none"
-                          required
-                        />
-                        <div className="bg-slate-900 border border-slate-800 rounded-xl p-2.5 flex flex-col items-center justify-center min-h-[100px]">
-                          {capturedPhoto ? (
-                            <div className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-cyan-400 shadow-lg">
-                              <img src={capturedPhoto} alt="Captured" className="w-full h-full object-cover" />
-                              <button type="button" onClick={() => setCapturedPhoto(null)} className="absolute inset-0 bg-slate-950/70 text-cyan-300 font-bold text-xs opacity-0 hover:opacity-100 flex items-center justify-center">Retake</button>
-                            </div>
-                          ) : isCameraActive ? (
-                            <div className="relative w-full max-w-[140px] aspect-square rounded-xl overflow-hidden border border-cyan-500/50 bg-black">
-                              <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-                              <button type="button" onClick={takeSnapshot} className="absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 bg-cyan-400 text-slate-950 font-bold text-[10px] rounded-full">Snap</button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <button type="button" onClick={startCamera} className="px-2.5 py-1.5 bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded-lg text-xs font-bold">Camera</button>
-                              <label className="px-2.5 py-1.5 bg-slate-800 text-slate-300 rounded-lg text-xs font-bold cursor-pointer">
-                                Upload <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
-                              </label>
-                            </div>
-                          )}
-                        </div>
-                        <button type="submit" className="w-full py-2 bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-bold rounded-xl text-xs uppercase tracking-wider">Save Contestant</button>
-                      </form>
-                    </div>
-
-                  </div>
-
-                  <div className="lg:col-span-7 space-y-4">
-                    <div className="bg-slate-950/80 border border-green-500/20 rounded-2xl p-4 shadow-xl space-y-3">
-                      <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                        <UserCheck className="w-4 h-4 text-green-400" />
-                        Judge Panel Setup ({judges.length} Active)
-                      </h3>
-                      <form onSubmit={handleAddJudge} className="flex gap-2">
-                        <input
-                          type="text"
-                          value={newJudgeName}
-                          onChange={(e) => setNewJudgeName(e.target.value)}
-                          placeholder="Enter judge title"
-                          className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white"
-                        />
-                        <button type="submit" className="px-3 py-1.5 bg-green-600 text-white font-bold text-xs rounded-xl">Add Judge</button>
-                      </form>
-                      <div className="flex flex-wrap gap-2">
-                        {judges.map((j) => (
-                          <div key={j} className="px-2.5 py-1 bg-slate-900 border border-slate-700 rounded-lg flex items-center gap-2 text-xs font-bold text-slate-200">
-                            <span>{j}</span>
-                            <button type="button" onClick={() => handleDeleteJudge(j)} className="text-slate-500 hover:text-red-400"><X className="w-3.5 h-3.5" /></button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="bg-slate-950/80 border border-cyan-500/20 rounded-2xl p-4 shadow-xl">
-                      <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-                        <Users className="w-4 h-4 text-cyan-400" />
-                        Enrolled Contestants ({contestants.length})
-                      </h3>
-                      {contestants.length === 0 ? (
-                        <div className="text-center py-6 text-slate-500 text-xs">No contestants enrolled yet.</div>
-                      ) : (
-                        <div className="space-y-2 overflow-y-auto max-h-[200px]">
-                          {contestants.map((c) => (
-                            <div key={c.id} className="p-2 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between text-xs">
-                              <span className="font-bold text-white">#{c.id} - {c.name}</span>
-                              <button onClick={() => handleDeleteContestant(c.id)} className="text-slate-500 hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* JUDGING TAB */}
-              {activeTab === 'judging' && (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
-                  <div className="lg:col-span-4 bg-slate-900/90 border border-cyan-500/20 rounded-2xl p-4 shadow-xl flex flex-col">
-                    <div className="mb-4">
-                      <label className="block text-xs font-bold text-cyan-400 uppercase mb-2">Evaluating Judge</label>
-                      <div className="p-2.5 bg-cyan-500/10 border border-cyan-500/30 rounded-xl font-bold text-xs text-cyan-300">
-                        Assigned: <span className="text-white">{selectedJudge}</span>
-                      </div>
-                    </div>
-
-                    <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Select Contestant</h4>
-                    <div className="space-y-2 overflow-y-auto max-h-[280px]">
-                      {contestants.map((c) => {
-                        const isSelected = c.id === selectedContestantId;
-                        const hasScored = scores[c.id]?.[selectedJudge];
-                        return (
-                          <button
-                            key={c.id}
-                            onClick={() => setSelectedContestantId(c.id)}
-                            className={`w-full text-left p-2 rounded-xl border flex items-center justify-between ${
-                              isSelected ? 'bg-cyan-500/20 border-cyan-500' : 'bg-slate-950/60 border-slate-800'
-                            }`}
-                          >
-                            <span className="font-bold text-xs text-white">#{c.id} {c.name}</span>
-                            <span className="font-mono text-xs text-cyan-400">{hasScored ? Object.values(scores[c.id][selectedJudge]).reduce((a,b)=>a+Number(b),0) : '--'}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="lg:col-span-8 bg-slate-900/90 border border-cyan-500/20 rounded-2xl p-5 shadow-xl flex flex-col justify-between">
-                    {selectedContestant ? (
-                      <div>
-                        <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
-                          <h2 className="text-xl font-black text-white">#{selectedContestant.id} {selectedContestant.name}</h2>
-                          <div className="text-2xl font-black font-mono text-cyan-300">{getJudgeTotalScore(selectedContestant.id, selectedJudge)} / 100</div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {CRITERIA_LIST.map((criteria) => {
-                            const val = getCriteriaScore(selectedContestant.id, selectedJudge, criteria.id);
-                            return (
-                              <div key={criteria.id} className="p-3 bg-slate-950 border border-slate-800 rounded-xl">
-                                <div className="flex justify-between text-xs font-bold text-cyan-300 mb-1">
-                                  <span>{criteria.name}</span>
-                                  <span>Max: {criteria.max}</span>
-                                </div>
-                                <input
-                                  type="range"
-                                  min="0"
-                                  max={criteria.max}
-                                  value={val}
-                                  onChange={(e) => handleScoreChange(selectedContestant.id, selectedJudge, criteria.id, e.target.value)}
-                                  className="w-full accent-cyan-400 h-2 bg-slate-800 rounded-lg cursor-pointer"
-                                />
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-center py-10 text-slate-500 text-xs">Select contestant to mark.</div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* LIVE LEADERBOARD TAB */}
-              {activeTab === 'results' && (
-                <div className="bg-slate-900/90 border border-cyan-500/20 rounded-2xl p-6 shadow-xl h-full flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-xl font-black text-white flex items-center gap-2 uppercase">
-                        <Trophy className="w-6 h-6 text-yellow-400" /> Live Event Leaderboard
-                      </h3>
-                      {userRole === 'Admin' && (
-                        <button
-                          onClick={() => setShowScoresInLeaderboard(!showScoresInLeaderboard)}
-                          className="px-3.5 py-1.5 bg-slate-950 border border-cyan-500/40 rounded-xl text-xs font-bold text-cyan-300"
-                        >
-                          {showScoresInLeaderboard ? 'Hide Calculated Marks' : 'Show Calculated Marks'}
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/60">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="border-b border-slate-800 text-[11px] text-slate-400 uppercase bg-slate-900/80">
-                            <th className="py-3 px-4">Rank</th>
-                            <th className="py-3 px-4">Contestant</th>
-                            <th className="py-3 px-4 text-center">Judges Evaluated</th>
-                            <th className="py-3 px-4 text-right">Live Average Score</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-800 text-xs">
-                          {getLeaderboard().map((c, idx) => (
-                            <tr key={c.id} className="hover:bg-slate-800/40">
-                              <td className="py-2.5 px-4 font-bold font-mono">#{idx + 1}</td>
-                              <td className="py-2.5 px-4 font-bold text-white">#{c.id} - {c.name}</td>
-                              <td className="py-2.5 px-4 text-center text-slate-400">{c.judgeCount} / {judges.length}</td>
-                              <td className="py-2.5 px-4 text-right font-mono font-black text-cyan-300 text-sm">
-                                {showScoresInLeaderboard ? `${c.avgScore} / 100` : '🔒 Hidden'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* WINNERS STAGE TAB */}
-              {activeTab === 'stage' && (
-                <div className="h-full flex flex-col justify-between space-y-4">
-                  <div className="text-center py-2">
-                    <h2 className="text-2xl font-black text-white uppercase tracking-wider">Grand Finale Winners Stage</h2>
-                    <p className="text-xs text-slate-400">Reveal top finalists in shuffled order, followed by individual winner podium announcements</p>
-                  </div>
-
-                  {/* STAGE 1: ONLY REVEAL TOP 5 BUTTON IS VISIBLE AT FIRST */}
+              {/* STAGE/WINNERS TAB */}
+              {activeTab === 'stage' && userRole === 'Admin' && (
+                <div className="space-y-6 text-center max-w-4xl mx-auto py-6">
                   {!top5Revealed ? (
-                    <div className="my-auto flex flex-col items-center justify-center space-y-6 py-12">
-                      <div className="relative group">
-                        <div className="absolute -inset-2 bg-gradient-to-r from-cyan-400 via-blue-500 to-green-400 rounded-3xl blur-xl opacity-75 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-pulse"></div>
-                        <button
-                          onClick={handleRevealTop5}
-                          disabled={isRevealingTop5}
-                          className="relative px-12 py-6 bg-slate-950 border-2 border-cyan-400 text-white font-black text-xl sm:text-2xl rounded-2xl shadow-2xl tracking-widest uppercase hover:scale-105 active:scale-95 transition-all flex items-center gap-4"
-                        >
-                          <Sparkles className="w-8 h-8 text-cyan-400 animate-spin" />
-                          {isRevealingTop5 ? 'DRUM ROLL... REVEALING TOP 5!' : 'REVEAL TOP 5 CONTESTANTS'}
-                        </button>
-                      </div>
-                      <p className="text-xs font-mono text-cyan-300/80">Press to trigger drum roll and shuffle reveal the top 5 contenders</p>
+                    <div className="py-12 space-y-6">
+                      <h2 className="text-3xl font-black text-white uppercase tracking-wider">PEO Retro King Grand Finale</h2>
+                      <button
+                        onClick={handleRevealTop5}
+                        disabled={isRevealingTop5}
+                        className="px-10 py-5 bg-gradient-to-r from-cyan-400 via-blue-500 to-green-400 text-slate-950 font-black text-xl rounded-2xl shadow-2xl hover:scale-105 transition-all uppercase tracking-widest"
+                      >
+                        {isRevealingTop5 ? 'Shuffling Finalists...' : 'REVEAL TOP 5 CONTESTANTS'}
+                      </button>
                     </div>
                   ) : (
-                    /* STAGE 2: SHUFFLED TOP 5 DISPLAYED + INDIVIDUAL 3 WINNERS REVEAL BUTTONS */
-                    <div className="space-y-6 overflow-y-auto max-h-full pr-1">
-                      
-                      {/* SHUFFLED TOP 5 FINALISTS CARDS */}
-                      <div className="bg-slate-950/80 border border-cyan-500/30 rounded-2xl p-4 shadow-xl">
-                        <div className="flex items-center justify-between mb-3 px-1">
-                          <h3 className="text-xs font-bold text-cyan-300 uppercase tracking-widest flex items-center gap-2">
-                            <Sparkles className="w-4 h-4 text-cyan-400" /> Top 5 Finalists (Randomized Order)
-                          </h3>
-                          <button
-                            onClick={() => setTop5Revealed(false)}
-                            className="text-[10px] text-slate-400 hover:text-cyan-300 underline font-mono"
-                          >
-                            Reset Stage
-                          </button>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+                    <div className="space-y-8 animate-in fade-in duration-700">
+                      <div className="bg-slate-950/80 border border-cyan-500/30 rounded-2xl p-5 shadow-xl">
+                        <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-widest mb-3">Top 5 Finalists (Random Shuffled Presentation)</h3>
+                        <div className="grid grid-cols-5 gap-3">
                           {shuffledTop5.map((c) => (
-                            <div key={c.id} className="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center flex flex-col items-center animate-in fade-in zoom-in duration-500">
+                            <div key={c.id} className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-center">
                               {c.photo ? (
-                                <img src={c.photo} alt={c.name} className="w-14 h-14 rounded-full object-cover border-2 border-cyan-400 my-1" />
+                                <img src={c.photo} alt={c.name} className="w-12 h-12 rounded-full object-cover mx-auto mb-2 border border-cyan-400" />
                               ) : (
-                                <div className="w-14 h-14 rounded-full bg-slate-800 text-cyan-300 font-mono font-bold flex items-center justify-center my-1">#{c.id}</div>
+                                <div className="w-12 h-12 rounded-full bg-slate-800 text-cyan-400 font-bold text-xs flex items-center justify-center mx-auto mb-2 font-mono">#{c.id}</div>
                               )}
-                              <div className="font-bold text-white text-xs truncate max-w-full">{c.name}</div>
-                              <span className="text-[9px] text-slate-400 font-mono mt-1">Finalist Contender</span>
+                              <div className="font-bold text-white text-xs truncate">{c.name}</div>
                             </div>
                           ))}
                         </div>
                       </div>
 
-                      {/* INDIVIDUAL 3 WINNER REVEAL BUTTONS */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        
-                        {/* 2nd Runner Up */}
-                        <div className="bg-slate-950/90 border border-blue-500/40 rounded-2xl p-4 text-center shadow-xl flex flex-col justify-between">
-                          <div>
-                            <div className="w-12 h-12 bg-blue-500/20 border border-blue-500/50 rounded-xl flex items-center justify-center mx-auto mb-2 text-blue-400">
-                              <Award className="w-6 h-6" />
-                            </div>
-                            <h3 className="text-sm font-bold text-white">2nd Runner-Up</h3>
-                            <p className="text-[10px] text-slate-400 mb-3">3rd Place Overall</p>
-                          </div>
-                          <button
-                            onClick={() => triggerReveal('2nd Runner-Up (3rd Place)', 2)}
-                            className="w-full py-2.5 bg-gradient-to-r from-blue-700 to-blue-600 text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow hover:scale-105 transition-all"
-                          >
-                            Reveal 2nd Runner-Up
-                          </button>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="bg-slate-900 border border-blue-500/40 p-5 rounded-2xl">
+                          <h4 className="font-bold text-white text-sm mb-3">2nd Runner-Up</h4>
+                          <button onClick={() => triggerReveal('2nd Runner-Up (3rd Place)', 2)} className="w-full py-3 bg-blue-600 font-bold rounded-xl text-xs uppercase">Reveal 2nd Runner-Up</button>
                         </div>
-
-                        {/* 1st Runner Up */}
-                        <div className="bg-slate-950/90 border border-cyan-500/40 rounded-2xl p-4 text-center shadow-xl flex flex-col justify-between">
-                          <div>
-                            <div className="w-12 h-12 bg-cyan-500/20 border border-cyan-500/50 rounded-xl flex items-center justify-center mx-auto mb-2 text-cyan-400">
-                              <Award className="w-6 h-6" />
-                            </div>
-                            <h3 className="text-sm font-bold text-white">1st Runner-Up</h3>
-                            <p className="text-[10px] text-slate-400 mb-3">2nd Place Overall</p>
-                          </div>
-                          <button
-                            onClick={() => triggerReveal('1st Runner-Up (2nd Place)', 1)}
-                            className="w-full py-2.5 bg-gradient-to-r from-cyan-600 to-cyan-500 text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow hover:scale-105 transition-all"
-                          >
-                            Reveal 1st Runner-Up
-                          </button>
+                        <div className="bg-slate-900 border border-cyan-500/40 p-5 rounded-2xl">
+                          <h4 className="font-bold text-white text-sm mb-3">1st Runner-Up</h4>
+                          <button onClick={() => triggerReveal('1st Runner-Up (2nd Place)', 1)} className="w-full py-3 bg-cyan-600 font-bold rounded-xl text-xs uppercase">Reveal 1st Runner-Up</button>
                         </div>
-
-                        {/* PEO Retro King Champion */}
-                        <div className="bg-gradient-to-b from-cyan-500/15 via-slate-950 to-slate-950 border-2 border-cyan-400 rounded-2xl p-4 text-center shadow-2xl flex flex-col justify-between relative overflow-hidden">
-                          <div className="absolute top-0 right-0 bg-cyan-400 text-slate-950 text-[9px] font-black px-2 py-0.5 rounded-bl-lg uppercase">Champion</div>
-                          <div>
-                            <div className="w-12 h-12 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-xl flex items-center justify-center mx-auto mb-2 text-slate-950 shadow-md">
-                              <Crown className="w-6 h-6 stroke-[2.5]" />
-                            </div>
-                            <h3 className="text-sm font-black text-cyan-300">PEO Retro King</h3>
-                            <p className="text-[10px] text-cyan-400/80 mb-3">1st Place Grand Winner</p>
-                          </div>
-                          <button
-                            onClick={() => triggerReveal('PEO RETRO KING 👑', 0)}
-                            className="w-full py-2.5 bg-gradient-to-r from-cyan-400 via-blue-500 to-green-400 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider shadow-lg hover:scale-105 transition-all"
-                          >
-                            Reveal Retro King 👑
-                          </button>
+                        <div className="bg-slate-900 border-2 border-cyan-400 p-5 rounded-2xl">
+                          <h4 className="font-black text-cyan-300 text-sm mb-3">PEO Retro King</h4>
+                          <button onClick={() => triggerReveal('PEO RETRO KING 👑', 0)} className="w-full py-3 bg-gradient-to-r from-cyan-400 to-green-400 text-slate-950 font-black rounded-xl text-xs uppercase">Reveal Retro King 👑</button>
                         </div>
-
                       </div>
                     </div>
                   )}
-
                 </div>
               )}
-
             </main>
           </div>
 
@@ -1095,6 +815,7 @@
                   src={customCountdownVideo} 
                   autoPlay 
                   playsInline 
+                  muted
                   className="absolute inset-0 w-full h-full object-cover z-0"
                 />
               ) : !revealModal.isCounting && customWinnerVideo ? (
@@ -1117,7 +838,7 @@
                 <X className="w-6 h-6" />
               </button>
 
-              {/* COUNTDOWN overlay card (only shown if not using custom countdown video) */}
+              {/* COUNTDOWN overlay card */}
               {revealModal.isCounting && !customCountdownVideo && (
                 <div className="relative z-20 w-full max-w-2xl bg-slate-900/80 border-2 border-cyan-400/80 rounded-3xl p-8 sm:p-10 text-center shadow-2xl backdrop-blur-md">
                   <div className="py-10 space-y-5">
@@ -1137,7 +858,7 @@
                 </div>
               )}
 
-              {/* WINNER REVEAL DISPLAY (Without solid square box container & with 5-second delayed text reveal) */}
+              {/* WINNER REVEAL DISPLAY - Appears after 5 seconds delay while background video plays */}
               {!revealModal.isCounting && showWinnerDetails && (
                 <div className="relative z-20 w-full max-w-3xl text-center space-y-6 animate-in fade-in zoom-in duration-1000">
                   <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-slate-950/70 border-2 border-cyan-400 text-cyan-300 text-sm font-black uppercase tracking-widest shadow-2xl backdrop-blur-md">
