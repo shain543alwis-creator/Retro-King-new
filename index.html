@@ -141,6 +141,9 @@
       const [showTop5, setShowTop5] = useState(false);
       const [shuffledTop5, setShuffledTop5] = useState([]);
 
+      // State to delay showing the winner details for 5 seconds after reveal begins
+      const [showWinnerDetails, setShowWinnerDetails] = useState(false);
+
       const [newContestantName, setNewContestantName] = useState('');
       const [newJudgeName, setNewJudgeName] = useState('');
       const [capturedPhoto, setCapturedPhoto] = useState(null);
@@ -527,6 +530,7 @@
           alert(`Not enough contestants scored to determine ${rankTitle}.`);
           return;
         }
+        setShowWinnerDetails(false);
         setRevealModal({
           isOpen: true,
           title: rankTitle,
@@ -568,6 +572,18 @@
         }
         return () => clearTimeout(timer);
       }, [revealModal.isOpen, revealModal.isCounting, revealModal.countdown]);
+
+      // 5-Second Delay Effect for Winner Text & Avatar Reveal
+      useEffect(() => {
+        let textDelayTimer;
+        if (revealModal.isOpen && !revealModal.isCounting) {
+          setShowWinnerDetails(false);
+          textDelayTimer = setTimeout(() => {
+            setShowWinnerDetails(true);
+          }, 5000);
+        }
+        return () => clearTimeout(textDelayTimer);
+      }, [revealModal.isOpen, revealModal.isCounting]);
 
       const selectedContestant = contestants.find(c => c.id === selectedContestantId) || contestants[0];
 
@@ -1101,65 +1117,71 @@
                 <X className="w-6 h-6" />
               </button>
 
-              {/* Show overlay card only if NOT counting with custom video, or when counting without custom video */}
-              {(!revealModal.isCounting || !customCountdownVideo) && (
+              {/* COUNTDOWN overlay card (only shown if not using custom countdown video) */}
+              {revealModal.isCounting && !customCountdownVideo && (
                 <div className="relative z-20 w-full max-w-2xl bg-slate-900/80 border-2 border-cyan-400/80 rounded-3xl p-8 sm:p-10 text-center shadow-2xl backdrop-blur-md">
-                  {revealModal.isCounting ? (
-                    <div className="py-10 space-y-5">
-                      <div className="text-xs font-extrabold uppercase tracking-widest text-cyan-400 animate-pulse">
-                        Revealing {revealModal.title}...
-                      </div>
-                      
-                      <div className="relative w-36 h-36 mx-auto flex items-center justify-center">
-                        <div className="absolute inset-0 bg-cyan-500/20 rounded-full blur-xl animate-ping"></div>
-                        <div className="w-32 h-32 border-4 border-cyan-500/40 border-t-cyan-400 rounded-full animate-spin"></div>
-                        <span className="absolute font-mono text-6xl font-black text-cyan-300">
-                          {revealModal.countdown}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-300 font-mono">Suspense building...</p>
+                  <div className="py-10 space-y-5">
+                    <div className="text-xs font-extrabold uppercase tracking-widest text-cyan-400 animate-pulse">
+                      Revealing {revealModal.title}...
                     </div>
-                  ) : (
-                    <div className="space-y-6 animate-in fade-in zoom-in duration-700">
-                      <div className="inline-flex items-center gap-2 px-5 py-1.5 rounded-full bg-cyan-500/30 border border-cyan-400 text-cyan-300 text-xs font-black uppercase tracking-widest shadow-lg">
-                        <Sparkles className="w-4 h-4 text-cyan-300" />
-                        {revealModal.title}
-                      </div>
-
-                      <div className="space-y-2">
-                        <h4 className="text-xs uppercase tracking-widest text-slate-300 font-extrabold">
-                          Congratulations To Contestant #{revealModal.contestant.id}!
-                        </h4>
-                        <h1 className="text-4xl sm:text-6xl font-black bg-gradient-to-r from-cyan-200 via-blue-100 to-green-300 bg-clip-text text-transparent tracking-wide leading-tight drop-shadow-[0_10px_25px_rgba(0,174,235,0.6)]">
-                          {revealModal.contestant.name}
-                        </h1>
-                      </div>
-
-                      <div className="relative w-40 h-40 mx-auto my-4 flex items-center justify-center">
-                        <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 via-blue-500 to-green-500 rounded-full blur-2xl opacity-90 animate-pulse"></div>
-                        <div className="relative w-full h-full bg-slate-950 border-4 border-cyan-400 rounded-full flex items-center justify-center shadow-2xl overflow-hidden">
-                          {revealModal.contestant.photo ? (
-                            <img src={revealModal.contestant.photo} alt={revealModal.contestant.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <Crown className="w-16 h-16 text-cyan-400 stroke-[2.5]" />
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex justify-center gap-2 text-xs text-cyan-200 font-bold uppercase tracking-widest">
-                        <span className="px-4 py-1.5 bg-slate-950/80 rounded-xl border border-cyan-400 shadow-md">👑 Official Event Winner</span>
-                      </div>
-
-                      <button
-                        onClick={() => setRevealModal({ ...revealModal, isOpen: false })}
-                        className="mt-4 px-8 py-3 bg-gradient-to-r from-cyan-400 via-blue-500 to-green-400 text-slate-950 font-black rounded-xl shadow-xl hover:scale-105 transition-all text-xs uppercase tracking-wider"
-                      >
-                        Close & Return to Stage
-                      </button>
+                    
+                    <div className="relative w-36 h-36 mx-auto flex items-center justify-center">
+                      <div className="absolute inset-0 bg-cyan-500/20 rounded-full blur-xl animate-ping"></div>
+                      <div className="w-32 h-32 border-4 border-cyan-500/40 border-t-cyan-400 rounded-full animate-spin"></div>
+                      <span className="absolute font-mono text-6xl font-black text-cyan-300">
+                        {revealModal.countdown}
+                      </span>
                     </div>
-                  )}
+                    <p className="text-xs text-slate-300 font-mono">Suspense building...</p>
+                  </div>
                 </div>
               )}
+
+              {/* WINNER REVEAL DISPLAY (Without solid square box container & with 5-second delayed text reveal) */}
+              {!revealModal.isCounting && showWinnerDetails && (
+                <div className="relative z-20 w-full max-w-3xl text-center space-y-6 animate-in fade-in zoom-in duration-1000">
+                  <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-slate-950/70 border-2 border-cyan-400 text-cyan-300 text-sm font-black uppercase tracking-widest shadow-2xl backdrop-blur-md">
+                    <Sparkles className="w-5 h-5 text-cyan-300 animate-spin" style={{ animationDuration: '6s' }} />
+                    {revealModal.title}
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="text-sm uppercase tracking-widest text-white font-extrabold drop-shadow-[0_4px_8px_rgba(0,0,0,0.9)]">
+                      Congratulations To Contestant #{revealModal.contestant.id}!
+                    </h4>
+                    <h1 className="text-5xl sm:text-7xl font-black bg-gradient-to-r from-cyan-200 via-blue-100 to-green-300 bg-clip-text text-transparent tracking-wide leading-none drop-shadow-[0_10px_35px_rgba(0,174,235,0.9)]">
+                      {revealModal.contestant.name}
+                    </h1>
+                  </div>
+
+                  <div className="relative w-44 h-44 mx-auto my-6 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 via-blue-500 to-green-500 rounded-full blur-3xl opacity-100 animate-pulse"></div>
+                    <div className="relative w-full h-full bg-slate-950 border-4 border-cyan-400 rounded-full flex items-center justify-center shadow-[0_0_50px_rgba(0,174,235,0.8)] overflow-hidden">
+                      {revealModal.contestant.photo ? (
+                        <img src={revealModal.contestant.photo} alt={revealModal.contestant.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <Crown className="w-20 h-20 text-cyan-400 stroke-[2.5]" />
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-center gap-2 text-xs text-cyan-200 font-black uppercase tracking-widest">
+                    <span className="px-6 py-2 bg-slate-950/80 rounded-2xl border-2 border-cyan-400 shadow-2xl backdrop-blur-md">
+                      👑 Official Event Winner
+                    </span>
+                  </div>
+
+                  <div>
+                    <button
+                      onClick={() => setRevealModal({ ...revealModal, isOpen: false })}
+                      className="mt-4 px-10 py-3.5 bg-gradient-to-r from-cyan-400 via-blue-500 to-green-400 text-slate-950 font-black rounded-2xl shadow-2xl hover:scale-105 transition-all text-xs uppercase tracking-wider"
+                    >
+                      Close & Return to Stage
+                    </button>
+                  </div>
+                </div>
+              )}
+
             </div>
           )}
 
