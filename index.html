@@ -142,7 +142,6 @@
       const [top5Revealed, setTop5Revealed] = useState(false);
       const [isRevealingTop5, setIsRevealingTop5] = useState(false);
 
-      // State to delay showing the winner details for 5 seconds after countdown completes
       const [showWinnerDetails, setShowWinnerDetails] = useState(false);
 
       const [newContestantName, setNewContestantName] = useState('');
@@ -274,42 +273,62 @@
         }
       };
 
-      const handleMediaUpload = (e, key, setter, dbPath) => {
-        const file = e.target.files[0];
-        if (file) {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            const base64Media = reader.result;
-            setter(base64Media);
-            localStorage.setItem(key, base64Media);
-            if (window.firebaseDb) {
-              window.dbSet(window.dbRef(window.firebaseDb, dbPath), base64Media);
+      const handleAddContestant = (e) => {
+        e.preventDefault();
+        if (!newContestantName.trim()) return;
+        
+        const nextNumber = contestants.length > 0 ? Math.max(...contestants.map(c => c.id)) + 1 : 1;
+        const newContestant = { 
+          id: nextNumber, 
+          name: newContestantName.trim(),
+          photo: capturedPhoto 
+        };
+
+        const updatedContestants = [...contestants, newContestant];
+        setContestants(updatedContestants);
+        if (window.firebaseDb) {
+          window.dbSet(window.dbRef(window.firebaseDb, 'contestants/' + nextNumber), newContestant);
+        }
+
+        setNewContestantName('');
+        setCapturedPhoto(null);
+        stopCamera();
+      };
+
+      const handleDeleteContestant = (id) => {
+        const updated = contestants.filter(c => c.id !== id);
+        setContestants(updated);
+        if (window.firebaseDb) {
+          window.dbSet(window.dbRef(window.firebaseDb, 'contestants/' + id), null);
+          window.dbSet(window.dbRef(window.firebaseDb, 'scores/' + id), null);
+        }
+        if (selectedContestantId === id && updated.length > 0) {
+          setSelectedContestantId(updated[0].id);
+        }
+      };
+
+      const handleScoreChange = (contestantId, judge, criteriaId, val) => {
+        const numericVal = Math.min(25, Math.max(0, Number(val) || 0));
+        setScores(prev => {
+          const updated = {
+            ...prev,
+            [contestantId]: {
+              ...prev[contestantId],
+              [judge]: {
+                ...prev[contestantId]?.[judge],
+                [criteriaId]: numericVal
+              }
             }
           };
-          reader.readAsDataURL(file);
-        }
+          if (window.firebaseDb) {
+            window.dbSet(window.dbRef(window.firebaseDb, `scores/${contestantId}/${judge}/${criteriaId}`), numericVal);
+          }
+          return updated;
+        });
       };
 
-      const handleAddJudge = (e) => {
-        e.preventDefault();
-        if (!newJudgeName.trim()) return;
-        const updated = [...judges, newJudgeName.trim()];
-        setJudges(updated);
-        setNewJudgeName('');
-        if (window.firebaseDb) {
-          window.dbSet(window.dbRef(window.firebaseDb, 'judges'), updated);
-        }
-      };
-
-      const handleDeleteJudge = (judgeName) => {
-        const updated = judges.filter(j => j !== judgeName);
-        setJudges(updated);
-        if (selectedJudge === judgeName && updated.length > 0) {
-          setSelectedJudge(updated[0]);
-        }
-        if (window.firebaseDb) {
-          window.dbSet(window.dbRef(window.firebaseDb, 'judges'), updated);
-        }
+      const getCriteriaScore = (contestantId, judge, criteriaId) => {
+        return scores[contestantId]?.[judge]?.[criteriaId] ?? 0;
       };
 
       const startCamera = async () => {
@@ -522,7 +541,6 @@
         return () => clearTimeout(timer);
       }, [revealModal.isOpen, revealModal.isCounting, revealModal.countdown]);
 
-      // 5-Second Delay Effect for Winner Text & Avatar Reveal
       useEffect(() => {
         let textDelayTimer;
         if (revealModal.isOpen && !revealModal.isCounting) {
